@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets and local files
+.env
+*.db
+.DS_Store
+.pytest_cache/
+.claude/
+
+# Not part of this project
+agentic-fund-manager/
+Aayush_Mehta_Resume.pdf
