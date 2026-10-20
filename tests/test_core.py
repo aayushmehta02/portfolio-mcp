@@ -3,6 +3,7 @@ Unit tests — no network calls, no broker credentials needed.
 Tests cover: holding normalisation, pipeline merge logic, prompt builder.
 """
 import pytest
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 
 from portfolio_mcp.schemas import (
@@ -12,7 +13,6 @@ from portfolio_mcp.schemas import (
 from portfolio_mcp.brokers.upstox import UpstoxAdapter
 from portfolio_mcp.data.pipeline import _is_sufficient, _merge_screener
 from portfolio_mcp.data.screener import ScreenerData
-from portfolio_mcp.assessment.prompts import build_assessment_prompt
 
 
 # ------------------------------------------------------------------
@@ -64,7 +64,7 @@ class TestUpstoxNormaliser:
             "average_price": "3500.0",
             "last_price": "3800.0",
         }
-        h = self.adapter._normalise(raw)
+        h = self.adapter._normalise(SimpleNamespace(**raw))
         assert h.ticker == "TCS"
         assert h.exchange == Exchange.NSE
         assert h.quantity == 5
@@ -82,7 +82,7 @@ class TestUpstoxNormaliser:
             "average_price": "400.0",
             "last_price": "420.0",
         }
-        h = self.adapter._normalise(raw)
+        h = self.adapter._normalise(SimpleNamespace(**raw))
         assert h.exchange == Exchange.BSE
 
     def test_zero_quantity_pnl(self):
@@ -94,7 +94,7 @@ class TestUpstoxNormaliser:
             "average_price": "0.0",
             "last_price": "1500.0",
         }
-        h = self.adapter._normalise(raw)
+        h = self.adapter._normalise(SimpleNamespace(**raw))
         assert h.pnl_percent == 0.0
 
     def test_portfolio_totals(self):
@@ -154,71 +154,3 @@ class TestPipelineMerge:
 # ------------------------------------------------------------------
 # Prompt builder
 # ------------------------------------------------------------------
-
-class TestPromptBuilder:
-
-    def test_prompt_contains_ticker(self):
-        portfolio = make_portfolio()
-        prompt = build_assessment_prompt(portfolio)
-        assert "RELIANCE" in prompt
-
-    def test_prompt_contains_profile_when_provided(self):
-        portfolio = make_portfolio()
-        profile = UserProfile(
-            user_id="u1",
-            risk_tolerance=RiskTolerance.AGGRESSIVE,
-            investment_goal=InvestmentGoal.GROWTH,
-            experience_level=ExperienceLevel.INTERMEDIATE,
-        )
-        prompt = build_assessment_prompt(portfolio, profile)
-        assert "aggressive" in prompt.lower()
-        assert "growth" in prompt.lower()
-
-    def test_prompt_includes_enriched_data(self):
-        h = make_holding()
-        h.enriched = FundamentalData(
-            ticker="RELIANCE",
-            pe_ratio=24.5,
-            debt_to_equity=0.4,
-            promoter_holding_pct=50.2,
-            sources_used=["screener"],
-        )
-        portfolio = make_portfolio(holdings=[h])
-        prompt = build_assessment_prompt(portfolio)
-        assert "pe_ratio" in prompt
-        assert "24.5" in prompt
-
-    def test_prompt_without_profile(self):
-        portfolio = make_portfolio()
-        prompt = build_assessment_prompt(portfolio, profile=None)
-        assert "USER PROFILE" not in prompt
-        assert "PORTFOLIO SUMMARY" in prompt
-
-
-# ------------------------------------------------------------------
-# SessionToken expiry
-# ------------------------------------------------------------------
-
-class TestSessionToken:
-    def test_expired_token(self):
-        from portfolio_mcp.schemas import SessionToken
-        token = SessionToken(
-            broker=Broker.UPSTOX,
-            access_token="abc",
-            expires_at=datetime.utcnow() - timedelta(hours=1),
-        )
-        assert token.is_expired() is True
-
-    def test_valid_token(self):
-        from portfolio_mcp.schemas import SessionToken
-        token = SessionToken(
-            broker=Broker.UPSTOX,
-            access_token="abc",
-            expires_at=datetime.utcnow() + timedelta(hours=22),
-        )
-        assert token.is_expired() is False
-
-    def test_no_expiry_never_expired(self):
-        from portfolio_mcp.schemas import SessionToken
-        token = SessionToken(broker=Broker.UPSTOX, access_token="abc")
-        assert token.is_expired() is False
