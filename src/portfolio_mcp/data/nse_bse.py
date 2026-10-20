@@ -7,6 +7,7 @@ Uses NSE India's unofficial JSON endpoints (no auth needed) for:
 from __future__ import annotations
 
 import logging
+from contextlib import aclosing
 from datetime import datetime
 
 import httpx
@@ -40,7 +41,7 @@ async def get_corporate_actions(ticker: str) -> list[CorporateAction]:
     actions: list[CorporateAction] = []
     try:
         client = await _get_nse_client()
-        async with client:
+        async with aclosing(client):
             resp = await client.get(
                 f"{NSE_BASE}/api/corporates-corporateActions",
                 params={"index": "equities", "symbol": ticker},
@@ -69,7 +70,7 @@ async def get_filings(ticker: str, limit: int = 10) -> list[Filing]:
     filings: list[Filing] = []
     try:
         client = await _get_nse_client()
-        async with client:
+        async with aclosing(client):
             resp = await client.get(
                 f"{NSE_BASE}/api/quote-equity",
                 params={"symbol": ticker, "section": "announcements"},
